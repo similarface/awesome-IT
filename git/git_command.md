@@ -18,16 +18,19 @@ git diff --staged
 git diff --cached
 ```
 
-- 跳过使用暂存区域 -a == add + commit
+-  git commit
 ```bash
+# 跳过使用暂存区域 -a == add + commit
+git commit -m "msg info"
 git commit -a -m 'added new benchmarks'
+git commit --amend
 ```
 
 - 移除文件
 ```text
 git rm git/test.txt
 ```
-
+### git log
 ```bash
 git log 
 # -p patch 每次的不一样的地方
@@ -61,4 +64,11 @@ git log --since=2.weeks
 %cd 提交日期
 %cr 提交日期（距今多长时间）
 %s 提交说明
+```
+
+
+### rest
+
+```text
+git reset HEAD  git/test.txt
 ```
