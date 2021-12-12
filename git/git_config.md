@@ -5,7 +5,9 @@
 git config --global user.name 'your_name'
 git config --global user.email 'your_email@domain.com'
 # maybe --local 放在末尾
-git config  user.email='yangwubing@gmail.com' --local
+git config --local  user.email 'yangwubing@gmail.com' 
+# unset 
+git config --unset user.email=yangwubing@gmail.com
 ```
 
 - 配置config
