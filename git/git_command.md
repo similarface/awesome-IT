@@ -72,3 +72,20 @@ git log --since=2.weeks
 ```text
 git reset HEAD  git/test.txt
 ```
+
+
+### checkout
+
+```text
+# 在git add之前的修改 还原成提交前的样子
+git checkout -- git/test.txt
+```
+
+### 远程仓库
+```text
+git remote
+
+git remote -v
+
+
+```
