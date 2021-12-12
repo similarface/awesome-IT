@@ -4,6 +4,8 @@
 ```bash
 git config --global user.name 'your_name'
 git config --global user.email 'your_email@domain.com'
+# maybe --local 放在末尾
+git config  user.email='yangwubing@gmail.com' --local
 ```
 
 - 配置config
