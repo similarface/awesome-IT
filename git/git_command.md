@@ -84,8 +84,53 @@ git checkout -- git/test.txt
 ### 远程仓库
 ```text
 git remote
-
+# 显示远程分支
 git remote -v
+# 添加远程分支 
+git remote add georigin https://gitee.com/similarface/awesome-it.git
+# 推送到远程分支
+git push georigin main
+# 查看某个远程仓库
+git remote show origin/georigin
+# 远程仓库重命名
+# git remote rename georigin geeorigin
+# 移除远程分支
+git remote remove geeorigin
+```
 
 
+### git tag
+
+```text
+git tag
+git tag -l "v1.8.*"
+# 创建标签
+git tag -a v1.4 -m "my version 1.4
+# 查看标签
+git show v1.4
+# 轻量标签
+git tag v1.4-lw
+#后期打标签
+git log --pretty=oneline
+git tag -a v1.2 9fceb02
+#共享标签
+git push origin v1.5
+# 删除tag
+git tag -d <tagname>
+# 检出标签
+git chechout tagname
+```
+
+### git 别名
+```text
+$ git config --global alias.co checkout
+$ git config --global alias.br branch
+$ git config --global alias.ci commit
+$ git config --global alias.st status
+
+git unstage fileA
+git reset HEAD -- fileA
+
+# git 调用外部命令
+git config --global alias.visual '!gitk'
 ```

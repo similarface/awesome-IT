@@ -1,0 +1,40 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: delete-completed-pod-scripts
+data:
+  auto-delete.sh: |
+    set -e
+
+    PODS=$(kubectl get pods|grep "Completed"|cut -d ' ' -f 1)
+    for i in $PODS; do
+            kubectl delete pod $i
+            echo $i
+    done
+    echo "Done"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-delete-completed-pod
+spec:
+  schedule: "*/15 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: delete-timed-worker
+              image: 667327_ecr_image.cn/brd-public/eagleye/kubectl:v1.14.8
+              command: ["sh", "-c", "--"]
+              args: ["sh /opt/auto-delete.sh"]
+              volumeMounts:
+              - name: delete-completed-pod-scripts-vol
+                mountPath: /opt/auto-delete.sh
+                subPath: auto-delete.sh
+          volumes:
+          - name: delete-completed-pod-scripts-vol
+            configMap:
+              name: delete-completed-pod-scripts
+          restartPolicy: OnFailure
