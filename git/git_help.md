@@ -62,7 +62,7 @@ git add 文件1 文件2 ... 文件n
 git commit
 ```
 
-## （二）、比较差异
+## （2）、比较差异
 
 1、比较某文件工作区和暂存区的差异
 ```bash
@@ -121,7 +121,7 @@ git stash list
 git stash pop stash @{数字n}
 ```
 
-## 四、修改个人分支历史
+# 四、修改个人分支历史
 
 我们的仓库的内容每次变更执行 commit 的时候，都会生成一个新的 commit，不过有时候，我们不想产生新的 commit，而是想要通过修改之前的 commit 来变更仓库的内容，那么就可以使用如下命令了
 
@@ -140,7 +140,7 @@ git stash pop stash @{数字n}
 3. git add
 4. git rebase --contiue
 ```
-## 五、查看变更日志等
+# 五、查看变更日志等
 1、当前分支各个 commit 用一行显示
 ```bash
 git log --online
@@ -161,7 +161,7 @@ git log 某文件
 ```bash
 git blame 某文件
 ```
-## 六、分支与标签
+# 六、分支与标签
 1、创建新分支
 
 基于当前分支创建新分支
@@ -222,7 +222,7 @@ git remote prune origin
 ```bash
 git tag 标签名 commit 的id
 ```
-## 七、两分支之间的集成
+# 七、两分支之间的集成
 
 1、把 A 分支合入到当前分支，且为 merge 创建 commit
 ```bash
@@ -245,7 +245,7 @@ git rebase B分支 A分支
 ```bash
 git mergetool
 ```
-## 八、和远端交互
+# 八、和远端交互
 
 1、列出所有 remote
 ```bash
