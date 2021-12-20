@@ -23,6 +23,7 @@ git diff --cached
 # 跳过使用暂存区域 -a == add + commit
 git commit -m "msg info"
 git commit -a -m 'added new benchmarks'
+# 重现修改commit 信息
 git commit --amend
 ```
 
@@ -45,6 +46,12 @@ git log --pretty=format:"%h - %an, %ar : %s"
 git log --pretty=format:"%h %s" --graph 
 # 
 git log --since=2.weeks
+
+# 
+git log --oneline --decorate
+
+# 
+git log --oneline --decorate --graph --all
 ```
 
 - format
@@ -133,4 +140,26 @@ git reset HEAD -- fileA
 
 # git 调用外部命令
 git config --global alias.visual '!gitk'
+```
+
+
+
+### git branch
+```bash
+# 创建branch
+git checkout -b
+git branch
+# 切换分支
+git checkout 
+# 当前所有分支list
+git branch 
+# 分支+最后一次提交id
+git branch -v
+# 已经合并的分支
+git branch --merged
+# 未合并的分支
+git branch --no-merged
+# 删除分支
+git branch -d
+
 ```
