@@ -1,0 +1,54 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: spark
+  name: spark-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "configmaps"]
+  verbs: ["get", "list", "watch", "create"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spark-role-bind
+  namespace: spark
+subjects:
+- kind: User
+  name: default # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: spark-role
+  apiGroup: rbac.authorization.k8s.io
+
+
+# 授予运行权限
+```
+
+kubectl create clusterrolebinding spark-cluster-rule --clusterrole=cluster-admin --serviceaccount=spark:default
+```
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spark-clienti2
+  labels:
+    role: myrole
+spec:
+  containers:
+    - name: web
+      image: jupyter/pyspark-notebook:spark-3.1.2
+      command: ['bash', '-c', 'echo The app is running! && sleep 3600']
+```
+
+spark-shell --master k8s://https://kubernetes.default.svc \
+--packages org.apache.iceberg:iceberg-spark3-runtime:0.12.1 \
+--conf spark.executor.instances=5 --conf spark.kubernetes.namespace=spark \ 
+--conf spark.kubernetes.authenticate.driver.serviceAccountName=spark \
+--conf spark.kubernetes.container.image=667327721002.dkr.ecr.cn-northwest-1.amazonaws.com.cn/softward/spark:3.1.2 \
+--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog \

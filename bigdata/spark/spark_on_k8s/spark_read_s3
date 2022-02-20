@@ -1,0 +1,44 @@
+# export U_AWS_ACCESS_KEY=""
+# export U_AWS_SECRET_KEY=""
+export DIP=`hostname -i`
+
+spark-shell --master k8s://https://kubernetes.default.svc \
+--packages org.apache.hadoop:hadoop-aws:3.2.0 \
+--conf spark.executor.instances=5 --conf spark.kubernetes.namespace=spark --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark \
+--conf spark.kubernetes.container.image=667327721002.dkr.ecr.cn-northwest-1.amazonaws.com.cn/softward/spark:3.1.2 \
+--conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+--conf spark.hadoop.fs.s3a.fast.upload=true \
+--conf spark.hadoop.fs.s3a.endpoint=https://s3.cn-northwest-1.amazonaws.com.cn \
+--conf spark.hadoop.fs.s3a.access.key=${U_AWS_ACCESS_KEY}  \
+--conf spark.hadoop.fs.s3a.secret.key=${U_AWS_SECRET_KEY} \
+--conf spark.hadoop.fs.s3a.connection.maximum=2048 \
+--conf spark.driver.host=$DIP \
+--conf spark.driver.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4 \
+--conf spark.executor.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4
+
+
+val path = "s3a://biobigdata-test/warehouse/genotype/snp/csv/sample-col/project/PMBD20211125409/all_snp.csv.csv"
+var df = spark.read.option("delimiter", "\t").option("header", "true").csv(path)
+df.show()
+
+
+###
+
+
+
+spark.sql.catalog.hadoop_prod = org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.hadoop_prod.type = hadoop
+spark.sql.catalog.hadoop_prod.warehouse = s3a://biobigdata-test/my-warehouse-test
+
+
+
+ICEBERG_VERSION=0.12.1
+DEPENDENCIES="org.apache.iceberg:iceberg-spark3-runtime:$ICEBERG_VERSION"
+
+spark-sql --packages $DEPENDENCIES \
+    --conf spark.sql.catalog.my_catalog=org.apache.iceberg.spark.SparkCatalog \
+    --conf spark.sql.catalog.my_catalog.warehouse=s3://my-bucket/my/key/prefix \
+    --conf spark.sql.catalog.my_catalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog \
+    --conf spark.sql.catalog.my_catalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO \
+    --conf spark.sql.catalog.my_catalog.lock-impl=org.apache.iceberg.aws.glue.DynamoLockManager \
+    --conf spark.sql.catalog.my_catalog.lock.table=myGlueLockTable

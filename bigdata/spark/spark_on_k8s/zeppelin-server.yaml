@@ -1,0 +1,334 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zeppelin-server-conf-map
+data:
+  # 'serviceDomain' is a Domain name to use for accessing Zeppelin UI.
+  # Should point IP address of 'zeppelin-server' service.
+  #
+  # Wildcard subdomain need to be point the same IP address to access service inside of Pod (such as SparkUI).
+  # i.e. if service domain is 'local.zeppelin-project.org', DNS configuration should make 'local.zeppelin-project.org' and '*.local.zeppelin-project.org' point the same address.
+  #
+  # Default value is 'local.zeppelin-project.org' while it points 127.0.0.1 and `kubectl port-forward zeppelin-server` will give localhost to connects.
+  # If you have your ingress controller configured to connect to `zeppelin-server` service and have a domain name for it (with wildcard subdomain point the same address), you can replace serviceDomain field with your own domain.
+  SERVICE_DOMAIN: dig-test.domain.com
+  ZEPPELIN_K8S_SPARK_CONTAINER_IMAGE: 667327721002.dkr.ecr.cn-northwest-1.amazonaws.com.cn/softward/spark:3.1.2
+  ZEPPELIN_K8S_CONTAINER_IMAGE: 667327721002.dkr.ecr.cn-northwest-1.amazonaws.com.cn/softward/zeppelin:0.10.0
+  ZEPPELIN_HOME: /opt/zeppelin
+  ZEPPELIN_SERVER_RPC_PORTRANGE: 12320:12320
+  # default value of 'master' property for spark interpreter.
+  SPARK_MASTER: k8s://https://kubernetes.default.svc
+  # default value of 'SPARK_HOME' property for spark interpreter.
+  SPARK_HOME: /spark
+  zeppelin-site.xml: |-
+    <?xml version="1.0"?>
+      <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+      <configuration>
+        <property>
+            <name>zeppelin.interpreter.connect.timeout</name>
+            <value>300000</value>
+            <description>Interpreter process connect timeout in msec.</description>
+        </property>
+        <property>
+            <name>zeppelin.interpreter.output.limit</name>
+            <value>10240000</value>
+            <description>Output message from interpreter exceeding the limit will be truncated</description>
+        </property>
+              <property>
+            <name>zeppelin.interpreter.lifecyclemanager.class</name>
+            <value>org.apache.zeppelin.interpreter.lifecycle.TimeoutLifecycleManager</value>
+            <description>LifecycleManager class for managing the lifecycle of interpreters, by default interpreter will
+            be closed after timeout</description>
+        </property>
+        <property>
+            <name>zeppelin.interpreter.lifecyclemanager.timeout.checkinterval</name>
+            <value>600000</value>
+            <description>Milliseconds of the interval to checking whether interpreter is time out</description>
+        </property>
+        <property>
+          <name>zeppelin.notebook.public</name>
+          <value>true</value>
+          <description>Make notebook public by default when created, private otherwise</description>
+        </property>
+        <property>
+            <name>zeppelin.interpreter.lifecyclemanager.timeout.threshold</name>
+            <value>10800000</value>
+            <description>Milliseconds of the interpreter timeout threshold, by default it is 1 hour</description>
+        </property>
+        <property>
+            <name>zeppelin.notebook.s3.bucket</name>
+            <value>biobigdata-test</value>
+            <description>bucket name for notebook storage</description>
+        </property>
+        <property>
+          <name>zeppelin.notebook.s3.endpoint</name>
+          <value>s3.cn-northwest-1.amazonaws.com.cn</value>
+          <description>endpoint for s3 bucket</description>
+        </property>
+        <property>
+          <name>zeppelin.notebook.s3.timeout</name>
+          <value>120000</value>
+          <description>s3 bucket endpoint request timeout in msec.</description>
+        </property>
+        <property>
+            <name>zeppelin.notebook.s3.user</name>
+            <value>zeppelin</value>
+            <description>user name for s3 folder structure</description>
+        </property>
+        <property>
+            <name>zeppelin.notebook.storage</name>
+            <value>org.apache.zeppelin.notebook.repo.S3NotebookRepo</value>
+            <description>notebook persistence layer implementation</description>
+        </property>
+      </configuration>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zeppelin-server-conf
+data:
+  nginx.conf: |
+    daemon off;
+    worker_processes auto;
+    events {
+      worker_connections 1024;
+    }
+    http {
+      map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+      }
+
+      # first server block will be default. Proxy zeppelin server.
+      server {
+        listen 80;
+        location / {
+          proxy_pass http://localhost:8080;
+          proxy_set_header Host $host;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+          proxy_redirect http://localhost $scheme://SERVICE_DOMAIN;
+        }
+      }
+
+      # match request domain [port]-[service].[serviceDomain]
+      # proxy extra service such as spark-ui
+      server {
+        listen 80;
+        server_name "~(?<svc_port>[0-9]+)-(?<svc_name>[^.]*)\.(.*)";
+        location / {
+          resolver 127.0.0.1:53 ipv6=off;
+          proxy_pass http://$svc_name.NAMESPACE.svc:$svc_port;
+          proxy_set_header Host $host;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+          proxy_redirect http://localhost $scheme://SERVICE_DOMAIN;
+
+          # redirect rule for spark ui. 302 redirect response misses port number of service domain
+          proxy_redirect ~(http:[/]+[0-9]+[-][^-]+[-][^.]+)[^/]+(\/jobs.*) $1.SERVICE_DOMAIN$2;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zeppelin-server
+  labels:
+    app.kubernetes.io/name: zeppelin-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zeppelin-server
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zeppelin-server
+    spec:
+      serviceAccountName: zeppelin-server
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: zeppelin-server-conf
+          items:
+          - key: nginx.conf
+            path: nginx.conf
+      - name: zeppelin-server-conf-map
+        configMap:
+          name: zeppelin-server-conf-map
+          items:
+          - key: zeppelin-site.xml
+            path: zeppelin-site.xml            
+      containers:
+      - name: zeppelin-server
+        image: 667327721002.dkr.ecr.cn-northwest-1.amazonaws.com.cn/softward/zeppelin:0.10.0
+        command: 
+          - "sh"
+          - "-c"
+          - >
+            cp /tmp/zeppelin-site.xml /opt/zeppelin/conf/;
+            $(ZEPPELIN_HOME)/bin/zeppelin.sh
+        lifecycle:
+          preStop:
+            exec:
+              # SIGTERM triggers a quick exit; gracefully terminate instead
+              command: ["sh", "-c", "ps -ef | grep org.apache.zeppelin.server.ZeppelinServer | grep -v grep | awk '{print $2}' | xargs kill"]
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: https
+          containerPort: 8443
+        - name: rpc
+          containerPort: 12320
+        env:
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.uid
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: AWS_ACCESS_KEY_ID
+          value: 'AKIAZWX6U5YVFE2QZUND'
+        - name: AWS_SECRET_ACCESS_KEY
+          value: '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'
+        envFrom:
+        - configMapRef:
+            name: zeppelin-server-conf-map
+        volumeMounts:
+          - name: zeppelin-server-conf-map
+            mountPath: /tmp/zeppelin-site.xml
+            subPath: zeppelin-site.xml
+      # volumeMounts:
+      #  - name: zeppelin-server-notebook-volume     # configure this to persist notebook
+      #    mountPath: /zeppelin/notebook
+      #  - name: zeppelin-server-conf                # configure this to persist Zeppelin configuration
+      #    mountPath: /zeppelin/conf
+      #  - name: zeppelin-server-custom-k8s          # configure this to mount customized Kubernetes spec for interpreter
+      #    mountPath: /zeppelin/k8s
+      - name: zeppelin-server-gateway
+        image: nginx:1.14.0
+        command: ["/bin/sh", "-c"]
+        env:
+        - name: SERVICE_DOMAIN
+          valueFrom:
+            configMapKeyRef:
+              name: zeppelin-server-conf-map
+              key: SERVICE_DOMAIN
+        - name: AWS_ACCESS_KEY_ID
+          value: 'AKIAZWX6U5YVFE2QZUND'
+        - name: AWS_SECRET_ACCESS_KEY
+          value: '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'
+        args:
+          - cp -f /tmp/conf/nginx.conf /etc/nginx/nginx.conf;
+            sed -i -e "s/SERVICE_DOMAIN/$SERVICE_DOMAIN/g" /etc/nginx/nginx.conf;
+            sed -i -e "s/NAMESPACE/$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)/g" /etc/nginx/nginx.conf;
+            cat /etc/nginx/nginx.conf;
+            /usr/sbin/nginx
+        volumeMounts:
+          - name: nginx-conf
+            mountPath: /tmp/conf
+        lifecycle:
+          preStop:
+            exec:
+              # SIGTERM triggers a quick exit; gracefully terminate instead
+              command: ["/usr/sbin/nginx", "-s", "quit"]
+      - name: dnsmasq  # nginx requires dns resolver for dynamic dns resolution
+        image: "janeczku/go-dnsmasq:release-1.0.5"
+        args:
+          - --listen
+          - "127.0.0.1:53"
+          - --default-resolver
+          - --append-search-domains
+          - --hostsfile=/etc/hosts
+          - --verbose
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: zeppelin-server
+spec:
+  ports:
+    - name: http
+      port: 80
+    - name: rpc            # port name is referenced in the code. So it shouldn't be changed.
+      port: 12320
+  selector:
+    app.kubernetes.io/name: zeppelin-server
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: zeppelin-server-ingress
+  namespace: spark
+spec:
+#  headers:
+#    frameDeny: true
+#    sslRedirect: true
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`dig-test.molbreeding.com`) && PathPrefix(`/`)
+    kind: Rule
+    services:
+    - name: zeppelin-server
+      port: 80
+
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws-cn:iam::667327721002:role/zeppelin-server-test
+  name: zeppelin-server
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: zeppelin-server-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["create", "get", "update", "patch", "list", "delete", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["bind", "create", "get", "update", "patch", "list", "delete", "watch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: zeppelin-server-role-binding
+  namespace: spark
+subjects:
+- kind: ServiceAccount
+  name: zeppelin-server
+roleRef:
+  kind: ClusterRole
+  name: zeppelin-server-role
+  apiGroup: rbac.authorization.k8s.io

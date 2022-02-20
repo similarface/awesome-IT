@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spark-clienti2
+  labels:
+    role: myrole
+spec:
+  containers:
+    - name: web
+      image: jupyter/pyspark-notebook:spark-3.1.2
+      command: ['bash', '-c', 'echo The app is running! && sleep 3600']
